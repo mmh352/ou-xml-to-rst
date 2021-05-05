@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "ou-xml-to-rst"
+version = "0.1.0"
+description = ""
+authors = ["Mark Hall <mark.hall@open.ac.uk>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+lxml = "^4.6.3"
+click = "^7.1.2"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+ou-xml-to-rst = 'ou_xml_to_rst.__main__:run_import'
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
