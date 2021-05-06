@@ -345,7 +345,7 @@ def process_section(idx, section, dest):
     global DEFER_OUTPUT
 
     filename = os.path.join(dest, f'section{idx + 1}/index.rst')
-    print(filename)
+    # print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     buffer = []
@@ -355,6 +355,7 @@ def process_section(idx, section, dest):
 
     if DEFER_OUTPUT:
         buffer.extend(DEFER_OUTPUT)
+        DEFER_OUTPUT = []
 
     with open(filename, 'w') as out_f:
         for line in buffer:
@@ -366,7 +367,7 @@ def process_session(idx, session, dest):
     global DEFER_OUTPUT
 
     filename = os.path.join(dest, f'session{idx + 1}/index.rst')
-    print(filename)
+    # print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     buffer = []
@@ -386,6 +387,7 @@ def process_session(idx, session, dest):
 
     if DEFER_OUTPUT:
         buffer.extend(DEFER_OUTPUT)
+        DEFER_OUTPUT = []
 
     with open(filename, 'w') as out_f:
         for line in buffer:
