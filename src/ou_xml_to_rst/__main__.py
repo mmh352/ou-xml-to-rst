@@ -28,13 +28,22 @@ def process_node(node: etree.Element, indent: str='') -> list:
     """Process a node."""
     global DEFER_OUTPUT
 
-    if node.tag == 'Title':
+    if node.tag in ['Title', 'Heading']:
         title_text = [node.text]
-        if len(node) > 0:
-            for child in node:
-                title_text.extend(process_node(child))
+        for child in node:
+            title_text.extend(process_node(child))
         title_text = ''.join(title_text).strip()
-        heading_char = '#'
+        heading_char = ''
+        if node.getparent().tag in ['Session', 'Section']:
+            heading_char = '#'
+        elif node.getparent().tag == 'InternalSection':
+            heading_char = '='
+        elif node.getparent().tag == 'SubSection':
+            heading_char = '-'
+        elif node.getparent().tag == 'Quote':
+            pass
+        else:
+            print(node.getparent().tag)
         return [title_text, heading_char * len(title_text), '']
     elif node.tag == 'Paragraph':
         buffer = [indent]
@@ -149,7 +158,7 @@ def process_node(node: etree.Element, indent: str='') -> list:
             for child in node:
                 buffer.extend(process_node(child))
             return [''.join(buffer), '']
-    elif node.tag in ['BulletedList', 'BulletedSubsidiaryList', 'UnNumberedList', 'NumberedList']:
+    elif node.tag in ['BulletedList', 'BulletedSubsidiaryList', 'UnNumberedList', 'UnNumberedSubsidiaryList', 'NumberedList']:
         buffer = []
         for child in node:
             buffer.extend(process_node(child, indent=indent))
@@ -174,7 +183,7 @@ def process_node(node: etree.Element, indent: str='') -> list:
                     buffer.extend(process_node(child, indent=f'{indent}{" " * len(item_tag)}'))
             return buffer
     elif node.tag == 'ComputerCode':
-        if '\n' in node.text:
+        if node.text and node.text.strip() and '\n' in node.text:
             buffer = [f'{indent}.. sourcecode::', '']
             buffer.extend([f'{indent}    {line}' for line in node.text.split('\n')])
             return ['\n'.join(buffer)]
@@ -186,12 +195,75 @@ def process_node(node: etree.Element, indent: str='') -> list:
             if node.tail:
                 buffer.append(node.tail)
             return buffer
+    elif node.tag == 'ComputerDisplay':
+        if node.text and node.text.strip() and '\n' in node.text:
+            buffer = [f'{indent}.. sourcecode::', '']
+            buffer.extend([f'{indent}    {line}' for line in node.text.split('\n')])
+            return ['\n'.join(buffer)]
+        elif node.xpath('Paragraph'):
+            buffer = [f'{indent}.. sourcecode::', '']
+            for child in node:
+                buffer.extend(process_node(child, indent=f'{indent}    '))
+            return buffer
+        else:
+            buffer = []
+            if node.text:
+                fix_trailing_space(node)
+                buffer.append(f'``{node.text}``')
+            if node.tail:
+                buffer.append(node.tail)
+            return buffer
+    elif node.tag == 'ComputerUI':
+        if node.text and node.text.strip() and '\n' in node.text:
+            buffer = [f'{indent}.. sourcecode::', '']
+            buffer.extend([f'{indent}    {line}' for line in node.text.split('\n')])
+            return ['\n'.join(buffer)]
+        elif node.xpath('Paragraph'):
+            buffer = [f'{indent}.. sourcecode::', '']
+            for child in node:
+                buffer.extend(process_node(child, indent=f'{indent}    '))
+            return buffer
+        else:
+            buffer = []
+            if node.text:
+                fix_trailing_space(node)
+                buffer.append(f'``{node.text}``')
+            if node.tail:
+                buffer.append(node.tail)
+            return buffer
     elif node.tag == 'Equation':
         math = MATH_XSLT(node.xpath('MathML')[0])
         if math:
             latex = bytes(math).decode().\
                 replace('\n', '').replace('\\[', '$$').replace('\\]', '$$').replace('\\', '\\\\')
             return [f'{indent}{latex}', '']
+    elif node.tag in ['InternalSection', 'SubSection']:
+        buffer = []
+        for child in node:
+            buffer.extend(process_node(child, indent=indent))
+        return buffer
+    elif node.tag == 'Table':
+        buffer = [f'{indent}.. list-table:: ']
+        header = node.xpath('TableHead')
+        if header:
+            buffer[0] = f'{buffer[0]}{header[0].text}'
+        if node.xpath('tbody/tr/th'):
+            buffer.append(f'{indent}    :header-rows: {len(node.xpath("tbody/tr[th]"))}')
+        buffer.append('')
+        for row in node.xpath('tbody/tr'):
+            for idx, cell in enumerate(row.xpath('th|td')):
+                cell_buffer = []
+                if idx == 0:
+                    cell_buffer.append(f'{indent}    * - ')
+                else:
+                    cell_buffer.append(f'{indent}      - ')
+                if cell.text:
+                    cell_buffer.append(cell.text)
+                for part in cell:
+                    cell_buffer.extend(process_node(part))
+                buffer.append(''.join(cell_buffer))
+        buffer.append('')
+        return buffer
     elif node.tag == 'i':
         buffer = []
         if node.text:
@@ -242,6 +314,25 @@ def process_node(node: etree.Element, indent: str='') -> list:
         if node.tail:
             buffer.append(node.tail)
         return buffer
+    elif node.tag == 'GlossaryTerm':
+        buffer = []
+        if node.text:
+            fix_trailing_space(node)
+            buffer.append(f':term:`{node.text}`')
+        if node.tail:
+            buffer.append(node.tail)
+        return buffer
+    elif node.tag == 'br':
+        if node.tail:
+            return [f'{indent}{node.tail}']
+    elif node.tag == 'sup':
+        buffer = []
+        fix_trailing_space(node)
+        if node.text:
+            buffer.append(f':superscript:`{node.text}`')
+        if node.tail:
+            buffer.append(node.tail)
+        return buffer
     elif node.tag in ['Section']:
         pass
     else:
@@ -254,6 +345,7 @@ def process_section(idx, section, dest):
     global DEFER_OUTPUT
 
     filename = os.path.join(dest, f'section{idx + 1}/index.rst')
+    print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     buffer = []
@@ -274,6 +366,7 @@ def process_session(idx, session, dest):
     global DEFER_OUTPUT
 
     filename = os.path.join(dest, f'session{idx + 1}/index.rst')
+    print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     buffer = []
@@ -325,7 +418,7 @@ def run_import(src, dest, block, part):
             ''
         ]
 
-        doc = etree.parse(src, parser=etree.XMLParser(remove_pis=True))
+        doc = etree.parse(src, parser=etree.XMLParser(remove_pis=True, remove_comments=True))
         for idx, session in enumerate(doc.xpath('Unit/Session')):
             process_session(idx, session, dest)
             buffer.append(f'    session{idx + 1}/index')
