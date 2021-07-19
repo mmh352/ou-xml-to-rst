@@ -309,7 +309,11 @@ def process_node(node: etree.Element, indent: str='') -> list:
             buffer.append(f'|{imageid}|')
             tmp = process_node(node.xpath('Image')[0])
             if tmp:
-                tmp[0] = f'.. |{imageid}|{tmp[0][2:]}'
+                tmp.insert(0, f'.. |{imageid}| rst-class:: inline-block')
+                tmp.insert(1, '')
+                for idx in range(1, len(tmp)):
+                    tmp[idx] = f'    {tmp[idx]}'
+                #tmp.append(f'{tmp[0][2:]}')
                 DEFER_OUTPUT.extend(tmp)
         if node.tail:
             buffer.append(node.tail)
@@ -344,7 +348,7 @@ def process_section(idx, section, dest):
     """Process a section level node."""
     global DEFER_OUTPUT
 
-    filename = os.path.join(dest, f'section{idx + 1}/index.rst')
+    filename = os.path.join(dest, f'subsection_{idx + 1}.rst')
     # print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
@@ -366,7 +370,7 @@ def process_session(idx, session, dest):
     """Process a session level node."""
     global DEFER_OUTPUT
 
-    filename = os.path.join(dest, f'session{idx + 1}/index.rst')
+    filename = os.path.join(dest, f'section_{idx + 1}/index.rst')
     # print(filename)
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
@@ -382,8 +386,8 @@ def process_session(idx, session, dest):
         buffer.append('    :hidden:')
         buffer.append('')
         for section_idx, section in enumerate(sections):
-            process_section(section_idx, section, os.path.join(dest, f'session{idx + 1}'))
-            buffer.append(f'    section{section_idx + 1}/index')
+            process_section(section_idx, section, os.path.join(dest, f'section_{idx + 1}'))
+            buffer.append(f'    subsection_{section_idx + 1}')
 
     if DEFER_OUTPUT:
         buffer.extend(DEFER_OUTPUT)
@@ -423,7 +427,7 @@ def run_import(src, dest, block, part):
         doc = etree.parse(src, parser=etree.XMLParser(remove_pis=True, remove_comments=True))
         for idx, session in enumerate(doc.xpath('Unit/Session')):
             process_session(idx, session, dest)
-            buffer.append(f'    session{idx + 1}/index')
+            buffer.append(f'    section_{idx + 1}/index')
 
         with open(os.path.join(dest, 'index.rst'), 'w') as out_f:
             for line in buffer:
