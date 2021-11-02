@@ -45,14 +45,19 @@ def process_node(node: etree.Element, indent: str='') -> list:
         else:
             print(node.getparent().tag)
         return [title_text, heading_char * len(title_text), '']
-    elif node.tag == 'Paragraph':
+    elif node.tag in ['Paragraph', 'Timing']:
         buffer = [indent]
         if node.text:
+            if node.tag == 'Timing':
+                buffer.append('*')
             buffer.append(node.text)
+            if node.tag == 'Timing':
+                buffer.append('*')
         for child in node:
             buffer.extend(process_node(child))
         return [''.join(buffer), '']
     elif node.tag == 'Box':
+        buffer = []
         heading_text = node.xpath('Heading/text()')
         if heading_text:
             buffer = [f'{indent}.. admonition:: {heading_text[0]}', '']
@@ -237,6 +242,11 @@ def process_node(node: etree.Element, indent: str='') -> list:
             latex = bytes(math).decode().\
                 replace('\n', '').replace('\\[', '$$').replace('\\]', '$$').replace('\\', '\\\\')
             return [f'{indent}{latex}', '']
+    elif node.tag == 'Reading':
+        buffer = []
+        for child in node:
+            buffer.extend(process_node(child, indent=f'{indent}    '))
+        return buffer
     elif node.tag in ['InternalSection', 'SubSection']:
         buffer = []
         for child in node:
@@ -329,6 +339,9 @@ def process_node(node: etree.Element, indent: str='') -> list:
     elif node.tag == 'br':
         if node.tail:
             return [f'{indent}{node.tail}']
+    elif node.tag == 'font':
+        if node.text:
+            return [f'{indent}{node.text}']
     elif node.tag == 'sup':
         buffer = []
         fix_trailing_space(node)
