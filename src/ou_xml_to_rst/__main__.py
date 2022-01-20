@@ -28,7 +28,7 @@ def process_node(node: etree.Element, indent: str='') -> list:
     """Process a node."""
     global DEFER_OUTPUT
 
-    if node.tag in ['Title', 'Heading']:
+    if node.tag in ['Title', 'Heading', 'SubHeading', 'SubSubHeading']:
         title_text = [node.text]
         for child in node:
             title_text.extend(process_node(child))
@@ -40,6 +40,10 @@ def process_node(node: etree.Element, indent: str='') -> list:
             heading_char = '='
         elif node.getparent().tag == 'SubSection':
             heading_char = '-'
+        elif node.tag == 'SubHeading':
+            heading_char = '~'
+        elif node.tag == 'SubSubHeading':
+            heading_char = '+'
         elif node.getparent().tag == 'Quote':
             pass
         else:
@@ -87,7 +91,11 @@ def process_node(node: etree.Element, indent: str='') -> list:
                 if caption[0].text:
                     tmp.append(caption[0].text)
                 for child in caption[0]:
-                    tmp.append(process_node(child))
+                    child_tmp = process_node(child)
+                    if isinstance(child_tmp, list):
+                        tmp.extend(child_tmp)
+                    else:
+                        tmp.append(child_tmp)
                 buffer.append(''.join(tmp))
                 buffer.append('')
             return buffer
@@ -157,7 +165,7 @@ def process_node(node: etree.Element, indent: str='') -> list:
         for child in node:
             buffer.extend(process_node(child))
         return [''.join(buffer), '']
-    elif node.tag == 'Reference':
+    elif node.tag in ['Reference', 'CrossRef']:
         if node.text:
             buffer = [f'.. [{node.text.strip()}] {node.text}']
             for child in node:
@@ -350,10 +358,16 @@ def process_node(node: etree.Element, indent: str='') -> list:
         if node.tail:
             buffer.append(node.tail)
         return buffer
-    elif node.tag in ['Section']:
+    elif node.tag in ['Section', 'FreeResponseDisplay', 'Interaction']:
         pass
+    elif node.tag in ['Multipart', 'Part', 'Question', 'ITQ', 'Discussion', 'KeyPoints']:
+        buffer = []
+        for child in node:
+            buffer.extend(process_node(child, indent))
+        return buffer
     else:
         print(node.tag)
+        print(etree.tostring(node))
     return []
 
 
